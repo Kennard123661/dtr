@@ -9,5 +9,7 @@ if hostname == 'kennardng-desktop':
 else:
     raise ValueError('no such hostname {}'.format(hostname))
 
+CONFIG_DIR = os.path.join(PROJECT_DIR, 'configs')
+NOTIFYHUB_FP = os.path.join(CONFIG_DIR, 'notifyhub.json')
 DATASET_DIR = os.path.join(SAVE_DIR, 'datasets')
 BLAST_DIR = os.path.join(DATASET_DIR , 'blast')

@@ -69,7 +69,18 @@ def process_dataset():
         np.save(save_file, test_idxs)
 
 
+def read_references():
+    with open(REFERENCE_FILE, 'r') as f:
+        references = f.readlines()
+    references = np.array([line.strip() for line in references])
+    reference_len = [len(line) for line in references]
+    print(np.unique(reference_len))
+
+    print(references)
+
+
 def main():
+    print(read_references())
     process_dataset()
 
 
