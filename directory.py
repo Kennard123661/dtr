@@ -3,7 +3,7 @@ import platform
 
 
 hostname = platform.node()
-if hostname == 'kennardng-deskop':
+if hostname == 'kennardng-desktop':
     PROJECT_DIR = '/home/kennardng/projects/dtr'
     SAVE_DIR = '/mnt/Data/project-storage/dtr'
 else:

@@ -1,2 +1,3 @@
 notifyhub
 numpy
+tqdm
