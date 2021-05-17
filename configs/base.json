@@ -1,0 +1,35 @@
+{
+  "net": {
+    "embed": {
+      "out ndims": 32,
+      "base ndims": 32,
+      "nlayers": 3
+    },
+
+    "window": {
+      "window size": 7,
+      "base ndims": 128,
+      "out ndims": 64
+    },
+
+    "lstm": {
+      "out ndims": 64
+    },
+
+    "global": {
+      "natt heads": 4
+    },
+
+    "update": {
+      "out ndims": 64,
+      "base ndims": 64
+    },
+
+    "pred": {
+      "base ndims": 64
+    },
+
+    "activation": "relu",
+    "batchnorm": 1
+  }
+}

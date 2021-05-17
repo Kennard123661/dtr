@@ -101,7 +101,7 @@ class SelfAttentionAggregation(nn.Module):
         return out
 
 
-class LstmModel(nn.Module):
+class DTR(nn.Module):
     def __init__(self, emb_out_ndims: int, emb_base_ndims: int, emb_nlayers: int,
                  window_size: int, window_out_ndims, window_base_ndims: int,
                  lstm_out_ndims: int,
@@ -109,7 +109,7 @@ class LstmModel(nn.Module):
                  global_natt_heads: int,
                  pred_base_ndims: int,
                  activation: str = None, batchnorm: bool = False):
-        super(LstmModel, self).__init__()
+        super(DTR, self).__init__()
         self.embedding_net = Conv1dNet(in_ndims=5, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
                                        padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
         self.belief_initializer = Conv1dNet(in_ndims=5, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
@@ -174,12 +174,22 @@ class LstmModel(nn.Module):
 
 def main():
     import json
-    config_file = '/home/kennardng/Desktop/deep-trace/configs/lstm/base-atth4-er10-w14.json'
+    config_file = '/home/kennardng/projects/dtr/configs/base.json'
     # config_file = '/home/kennardngpoolhua/Desktop/deep-trace/configs/lstm/base-atth4-er10-w14.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
+    config = config['net']
     out_length = 120
-    model = Model(output_length=out_length, config=config['model'])
+
+    model = DTR(emb_out_ndims=config['embed']['out ndims'], emb_base_ndims=config['embed']['base ndims'],
+                emb_nlayers=config['embed']['nlayers'],
+                window_out_ndims=config['window']['out ndims'], window_base_ndims=config['embed']['base ndims'],
+                window_size=config['window']['window size'],
+                lstm_out_ndims=config['lstm']['out ndims'],
+                update_out_ndims=config['update']['out ndims'], update_base_ndims=config['[update']['base ndims'],
+                global_natt_heads=config['global']['natt heads'],
+                pred_base_ndims=config['pred']['base ndims'],
+                activation=config['activation'], batchnorm=config['batchnorm'])
     forward_data = torch.randn(size=[3, 10, 130, 5]).float()
     backward_data = torch.randn(size=[3, 10, 130, 5]).float()
     out = model(forward_data, backward_data)
