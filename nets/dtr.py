@@ -44,10 +44,11 @@ class Lstm(nn.Module):
     def __init__(self, in_ndims: int, out_ndims: int):
         super(Lstm, self).__init__()
         self.lstm = nn.LSTMCell(input_size=in_ndims, hidden_size=out_ndims)
+        self.out_ndims = out_ndims
 
     def get_initial_states(self, batchsize: int, device) -> (torch.Tensor, torch.Tensor):
-        c_states = torch.zeros([batchsize, self.out_dims], device=device)
-        h_states = torch.zeros([batchsize, self.out_dims], device=device)
+        c_states = torch.zeros([batchsize, self.out_ndims], device=device)
+        h_states = torch.zeros([batchsize, self.out_ndims], device=device)
         return c_states, h_states
 
     def forward(self, window_in: torch.Tensor, c_states: torch.Tensor, h_states: torch.Tensor):
@@ -105,7 +106,7 @@ class DTR(nn.Module):
     def __init__(self, emb_out_ndims: int, emb_base_ndims: int, emb_nlayers: int,
                  window_size: int, window_out_ndims, window_base_ndims: int,
                  lstm_out_ndims: int,
-                 update_out_ndims: int, update_base_ndims: int,
+                 update_base_ndims: int,
                  global_natt_heads: int,
                  pred_base_ndims: int,
                  activation: str = None, batchnorm: bool = False):
@@ -126,8 +127,8 @@ class DTR(nn.Module):
                                                              att_ndims=lstm_out_ndims, natt_heads=global_natt_heads,
                                                              activation=activation, batchnorm=batchnorm)
 
-        self.update_net = MlpNet(in_ndims=lstm_out_ndims * 2, out_ndims=update_out_ndims, base_ndims=update_base_ndims,
-                                 nlayers=2, activation=activation, batchnorm=batchnorm)
+        self.update_net = MlpNet(in_ndims=lstm_out_ndims * 2, out_ndims=emb_out_ndims*(window_size-1),
+                                 base_ndims=update_base_ndims, nlayers=2, activation=activation, batchnorm=batchnorm)
 
         self.prediction_net = MlpNet(in_ndims=lstm_out_ndims, out_ndims=5, nlayers=2, base_ndims=pred_base_ndims,
                                      activation=activation, batchnorm=batchnorm)
@@ -142,7 +143,7 @@ class DTR(nn.Module):
         belief = self.belief_initializer(reads)  # BR x D x L
 
         c_states, h_states = self.lstm.get_initial_states(batchsize=nstrands, device=reads.device)
-        assert self.out_length < sequence_length + self.window_size
+        assert int(out_length) <= int(sequence_length + self.window_size)
         predictions = []
         for start in range(out_length):
             end = start + self.window_size
@@ -186,13 +187,13 @@ def main():
                 window_out_ndims=config['window']['out ndims'], window_base_ndims=config['embed']['base ndims'],
                 window_size=config['window']['window size'],
                 lstm_out_ndims=config['lstm']['out ndims'],
-                update_out_ndims=config['update']['out ndims'], update_base_ndims=config['[update']['base ndims'],
+                update_base_ndims=config['update']['base ndims'],
                 global_natt_heads=config['global']['natt heads'],
                 pred_base_ndims=config['pred']['base ndims'],
                 activation=config['activation'], batchnorm=config['batchnorm'])
     forward_data = torch.randn(size=[3, 10, 130, 5]).float()
     backward_data = torch.randn(size=[3, 10, 130, 5]).float()
-    out = model(forward_data, backward_data)
+    out = model(forward_data, out_length)
     print(out.shape)
 
 

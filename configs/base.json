@@ -21,7 +21,6 @@
     },
 
     "update": {
-      "out ndims": 64,
       "base ndims": 64
     },
 
