@@ -51,6 +51,15 @@ class Dataset(tdata.Dataset):
         references = [self.to_tensor(strand=line) for line in references]
         self.references = [torch.argmax(line, dim=1).reshape(-1) for line in references]
 
+        all_reads = []
+        for cluster_idx in cluster_idxs:
+            read_file = os.path.join(self.read_dir, '{}.txt'.format(cluster_idx))
+            with open(read_file, 'r') as f:
+                reads = f.readlines()
+            reads = [read.strip() for read in reads]
+            all_reads.append(reads)
+        self.all_reads = all_reads
+
         self.read_batchsize = read_batchsize
         self.cluster_idxs = cluster_idxs
         self.window_size = window_size
@@ -68,12 +77,8 @@ class Dataset(tdata.Dataset):
 
     def __getitem__(self, i):
         reference = self.references[i]
-        cluster_id = self.cluster_idxs[i]
-        read_file = os.path.join(self.read_dir, '{}.txt'.format(cluster_id))
-        with open(read_file, 'r') as f:
-            reads = f.readlines()
+        reads = self.all_reads[i]
 
-        reads = [read.strip() for read in reads]
         sample_idxs = np.random.choice(len(reads), size=self.read_batchsize, replace=True)
         reads = [reads[i] for i in sample_idxs]
         reads = [self.to_tensor(read) for read in reads]
