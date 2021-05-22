@@ -9,6 +9,8 @@ import sys
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')  # fixed shared  memory error
 
 if __name__ == '__main__':
     PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -19,6 +21,7 @@ from nets.dtr import DTR
 
 DNA_BASES = ['A', 'T', 'C', 'G']
 NUM_WORKERS = 2
+
 
 def get_train_test_data(dataset: str) -> (np.ndarray, np.ndarray, os.path, os.path):
     if dataset == 'blast':
