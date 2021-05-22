@@ -40,7 +40,15 @@ def read_raw_file() -> (list, list):
         all_references.append(reference)
         all_reads.append(reads)
     assert len(all_references) == len(all_reads)
-    return all_references, all_reads
+
+    # remove references without any reads
+    out_references, out_reads = [], []
+    for i, reference in enumerate(all_references):
+        reads = all_reads[i]
+        if len(reads) > 0:
+            out_references.append(reference)
+            out_reads.append(reads)
+    return out_references, out_reads
 
 
 def process_dataset():
@@ -54,6 +62,7 @@ def process_dataset():
 
     for i, reads in enumerate(all_reads):
         save_file = os.path.join(READ_DIR, '{}.txt'.format(i))
+        assert len(reads) > 0
         with open(save_file, 'w') as f:
             for read in reads:
                 f.write(read + '\n')

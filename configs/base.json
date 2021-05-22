@@ -1,4 +1,16 @@
 {
+  "optimizer": {
+    "name": "adam",
+    "lr": 0.001
+  },
+
+  "dataset": "blast",
+
+  "max nepochs": 50,
+  "train batchsize": 2,
+  "test batchsize": 32,
+  "nreads per cluster": 10,
+
   "net": {
     "embed": {
       "out ndims": 32,

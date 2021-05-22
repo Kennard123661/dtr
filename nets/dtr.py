@@ -29,13 +29,16 @@ class WindowEmbeddingNet(nn.Module):
     def __init__(self, in_ndims, out_ndims: int, base_ndims: int, window_size: int, activation: str = None,
                  batchnorm: bool = False):
         super(WindowEmbeddingNet, self).__init__()
+        self.in_ndims = in_ndims
+        self.window_size = window_size
         self.net = MlpNet(in_ndims=in_ndims * window_size, out_ndims=out_ndims, base_ndims=base_ndims, nlayers=2,
                           activation=activation, batchnorm=batchnorm)
 
     def forward(self, x: torch.Tensor):
         assert len(x.shape) == 3, 'BR x D x W'
-        nstrands, ndims, window_sze = x.shape
-        out = x.view(nstrands, ndims * window_sze)
+        nstrands, ndims, window_size = x.shape
+        assert self.in_ndims * self.window_size == window_size * ndims
+        out = x.view(nstrands, ndims * window_size)
         out = self.net(out)
         return out
 
@@ -111,9 +114,9 @@ class DTR(nn.Module):
                  pred_base_ndims: int,
                  activation: str = None, batchnorm: bool = False):
         super(DTR, self).__init__()
-        self.embedding_net = Conv1dNet(in_ndims=5, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
+        self.embedding_net = Conv1dNet(in_ndims=4, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
                                        padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
-        self.belief_initializer = Conv1dNet(in_ndims=5, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
+        self.belief_initializer = Conv1dNet(in_ndims=4, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
                                             padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
 
         self.window_size = window_size
@@ -136,7 +139,7 @@ class DTR(nn.Module):
     def forward(self, reads: torch.Tensor, out_length: int):
         batchsize, nreads, sequence_length, _ = reads.shape
         nstrands = batchsize * nreads
-        reads = reads.view(nstrands, sequence_length, 5)
+        reads = reads.view(nstrands, sequence_length, 4)
         reads = reads.permute(0, 2, 1)  # BR x 5 x L
 
         original = self.embedding_net(reads)  # BR x D x L
@@ -191,8 +194,8 @@ def main():
                 global_natt_heads=config['global']['natt heads'],
                 pred_base_ndims=config['pred']['base ndims'],
                 activation=config['activation'], batchnorm=config['batchnorm'])
-    forward_data = torch.randn(size=[3, 10, 130, 5]).float()
-    backward_data = torch.randn(size=[3, 10, 130, 5]).float()
+    forward_data = torch.randn(size=[3, 10, 130, 4]).float()
+    backward_data = torch.randn(size=[3, 10, 130, 4]).float()
     out = model(forward_data, out_length)
     print(out.shape)
 
