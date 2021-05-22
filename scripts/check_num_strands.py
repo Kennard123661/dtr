@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 
 
-def check_nstrands(file: str) -> (list, list):
+def check_num_strands(file: str) -> (list, list):
     print('INFO: checking raw dataset file {}...'.format(file))
     with open(file, 'r') as f:
         lines = f.readlines()
@@ -37,7 +37,7 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--file', type=str, required=True, help='path to the dna read file.')
     args = argparser.parse_args()
-    check_nstrands(file=args.file)
+    check_num_strands(file=args.file)
 
 
 if __name__ == '__main__':

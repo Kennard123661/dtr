@@ -5,7 +5,6 @@ import argparse
 import json
 import torch.optim as optim
 import torch.utils.data as tdata
-import math
 import sys
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
@@ -308,6 +307,7 @@ class Trainer:
         for k, v in results.items():
             message += ' {} {};'.format(k, v)
         print(message)
+        notifyhub.send(message=message, config_fp=NOTIFYHUB_FP)
         return results
 
     def get_predictions(self, forward_reads: torch.Tensor, backward_reads: torch.Tensor, prediction_lengths) -> list:

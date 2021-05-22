@@ -74,6 +74,8 @@ def process_dataset():
     np.random.shuffle(idxs)
     for i in range(NSPLITS):
         save_file = os.path.join(SPLIT_DIR, 'split-{}.npy'.format(i))
+        if os.path.exists(save_file):
+            continue
         test_idxs = np.sort(idxs[i::NSPLITS])
         np.save(save_file, test_idxs)
 
