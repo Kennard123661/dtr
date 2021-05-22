@@ -6,6 +6,9 @@ hostname = platform.node()
 if hostname == 'kennardng-desktop':
     PROJECT_DIR = '/home/kennardng/projects/dtr'
     DATA_DIR = '/mnt/Data/project-storage/dtr'
+elif hostname == 'xgpe2':
+    PROJECT_DIR = '/home/e/e0036319/projects/dtr'
+    DATA_DIR = '/home/e/e0036319/project-storage/dtr'
 else:
     raise ValueError('no such hostname {}'.format(hostname))
 
