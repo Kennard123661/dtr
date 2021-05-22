@@ -7,7 +7,8 @@
 ```bash
 conda create -n dtr python==3.7.6
 conda activate dtr
-pip install -r requirements.txt
+chmod +x setup.sh
+./setup.sh
 ```
 
 
