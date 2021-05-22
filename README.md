@@ -11,7 +11,17 @@ pip install -r requirements.txt
 ```
 
 
-## Training
+## Scripts
+
+### Processing datasets
+
+```bash
+python scripts/process_datasets.py
+```
+
+
+### Training
+
 
 Run the following script with the `dtr` activated.
 

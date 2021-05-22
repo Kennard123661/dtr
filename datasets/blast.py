@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from directory import BLAST_DIR as DATASET_DIR
 
-RAW_DATASET_FILE = os.path.join(DATASET_DIR, 'combined_djordje_with_references.txt')
+RAW_DATASET_FILE = os.path.join(DATASET_DIR, 'combined_yasamin_with_references.txt')
 PROCESSED_DIR = os.path.join(DATASET_DIR, 'processed')
 REFERENCE_FILE = os.path.join(PROCESSED_DIR, 'references.txt')
 READ_DIR = os.path.join(PROCESSED_DIR, 'noisy-reads')
