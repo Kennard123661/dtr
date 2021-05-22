@@ -18,7 +18,7 @@ from directory import CONFIG_DIR, SAVE_DIR, NOTIFYHUB_FP
 from nets.dtr import DTR
 
 DNA_BASES = ['A', 'T', 'C', 'G']
-
+NUM_WORKERS = 2
 
 def get_train_test_data(dataset: str) -> (np.ndarray, np.ndarray, os.path, os.path):
     if dataset == 'blast':
@@ -217,7 +217,7 @@ class Trainer:
     def train_epoch(self, dataset: Dataset) -> float:
         self.net.train()
         dataloader = tdata.DataLoader(dataset=dataset, batch_size=self.train_batchsize, collate_fn=dataset.collate_fn,
-                                      num_workers=6, shuffle=True, drop_last=True)
+                                      num_workers=NUM_WORKERS, shuffle=True, drop_last=True)
 
         losses = []
         pbar = tqdm(dataloader)
@@ -255,7 +255,7 @@ class Trainer:
                               window_size=self.config['net']['window']['window size'],
                               read_batchsize=self.config['nreads per cluster'])
             dataloader = tdata.DataLoader(dataset=dataset, batch_size=self.test_batchsize,
-                                          collate_fn=dataset.collate_fn, num_workers=6,
+                                          collate_fn=dataset.collate_fn, num_workers=NUM_WORKERS,
                                           shuffle=False, drop_last=False)
 
             print('INFO: predicting DNA strands...')
