@@ -50,6 +50,10 @@ class Dataset(tdata.Dataset):
         references = [references[i] for i in cluster_idxs]
         references = [self.to_tensor(strand=line) for line in references]
         self.references = [torch.argmax(line, dim=1).reshape(-1) for line in references]
+        self.read_batchsize = read_batchsize
+        self.cluster_idxs = cluster_idxs
+        self.window_size = window_size
+        self.read_dir = read_dir
 
         all_reads = []
         for cluster_idx in cluster_idxs:
@@ -59,11 +63,6 @@ class Dataset(tdata.Dataset):
             reads = [read.strip() for read in reads]
             all_reads.append(reads)
         self.all_reads = all_reads
-
-        self.read_batchsize = read_batchsize
-        self.cluster_idxs = cluster_idxs
-        self.window_size = window_size
-        self.read_dir = read_dir
 
     @staticmethod
     def to_tensor(strand: str) -> torch.Tensor:
