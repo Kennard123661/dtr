@@ -17,4 +17,4 @@ SAVE_DIR = os.path.join(DATA_DIR, 'saved')
 
 NOTIFYHUB_FP = os.path.join(CONFIG_DIR, 'notifyhub.json')
 DATASET_DIR = os.path.join(DATA_DIR, 'datasets')
-BLAST_DIR = os.path.join(DATASET_DIR , 'blast')
+BLAST_DIR = os.path.join(DATASET_DIR, 'blast')
