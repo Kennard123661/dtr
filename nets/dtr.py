@@ -118,6 +118,7 @@ class DTR(nn.Module):
                                        padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
         self.belief_initializer = Conv1dNet(in_ndims=4, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
                                             padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
+        self.belief_normalization = nn.InstanceNorm1d(emb_out_ndims)
 
         self.window_size = window_size
         self.window_net = WindowEmbeddingNet(in_ndims=emb_out_ndims*2, out_ndims=window_out_ndims,
@@ -153,6 +154,7 @@ class DTR(nn.Module):
 
             original_window = original[:, :, start:end]  # BR x D x W
             belief_window = belief[:, :, start:end]  # BR x D x W
+            belief_window = self.belief_normalization(belief_window)
 
             window_inputs = torch.cat([belief_window, original_window], dim=1)  # BR x 2D x W
             window_inputs = self.window_net(window_inputs)  # BR x DW

@@ -27,5 +27,5 @@ python scripts/process_datasets.py
 Run the following script with the `dtr` activated.
 
 ```bash
-python scripst/train_dtr_double.py --config base
+python scripts/train_dtr_double.py --config base
 ```

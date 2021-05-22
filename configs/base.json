@@ -7,8 +7,8 @@
   "dataset": "blast",
 
   "max nepochs": 50,
-  "train batchsize": 2,
-  "test batchsize": 32,
+  "train batchsize": 128,
+  "test batchsize": 128,
   "nreads per cluster": 10,
 
   "net": {
