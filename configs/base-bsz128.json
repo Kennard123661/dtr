@@ -1,0 +1,46 @@
+{
+  "optimizer": {
+    "name": "adam",
+    "lr": 0.001
+  },
+
+  "dataset": "blast",
+
+  "max nepochs": 50,
+  "train batchsize": 128,
+  "test batchsize": 128,
+  "nreads per cluster": 10,
+
+  "net": {
+    "embed": {
+      "out ndims": 32,
+      "base ndims": 32,
+      "nlayers": 3
+    },
+
+    "window": {
+      "window size": 7,
+      "base ndims": 128,
+      "out ndims": 64
+    },
+
+    "lstm": {
+      "out ndims": 64
+    },
+
+    "global": {
+      "natt heads": 4
+    },
+
+    "update": {
+      "base ndims": 64
+    },
+
+    "pred": {
+      "base ndims": 64
+    },
+
+    "activation": "relu",
+    "batchnorm": 1
+  }
+}
