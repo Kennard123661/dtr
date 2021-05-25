@@ -56,8 +56,17 @@ class Dataset(tdata.Dataset):
         references = [torch.from_numpy(reference).long() for reference in references]
 
         self.references = [references[i] for i in cluster_idxs]
-        self.read_files = [os.path.join(read_dir, '{}.txt'.format(i)) for i in cluster_idxs]
         self.window_size = window_size
+
+        all_reads = []
+        for i in cluster_idxs:
+            read_file = os.path.join(read_dir, '{}.txt'.format(i))
+            with open(read_file, 'r') as f:
+                reads = f.readlines()
+            reads = [read.strip() for read in reads]
+            reads = [self.to_tensor(read) for read in reads]
+            all_reads.append(reads)
+        self.all_reads = all_reads
 
     @staticmethod
     def to_tensor(strand: str) -> torch.Tensor:
@@ -72,13 +81,7 @@ class Dataset(tdata.Dataset):
     def __getitem__(self, i):
         reference = self.references[i]
         reference_length = reference.shape[0]
-
-        # parse reads
-        read_file = self.read_files[i]
-        with open(read_file, 'r') as f:
-            reads = f.readlines()
-        reads = [read.strip() for read in reads]
-        reads = [self.to_tensor(read) for read in reads]
+        reads = self.all_reads[i]
 
         read_lengths = [read.shape[0] for read in reads]
         batch_length = max(max(read_lengths), reference_length + self.window_size)
