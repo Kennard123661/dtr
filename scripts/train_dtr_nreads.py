@@ -59,7 +59,7 @@ class Dataset(tdata.Dataset):
         self.window_size = window_size
 
         all_reads = []
-        for i in cluster_idxs:
+        for i in tqdm(cluster_idxs):
             read_file = os.path.join(read_dir, '{}.txt'.format(i))
             with open(read_file, 'r') as f:
                 reads = f.readlines()
