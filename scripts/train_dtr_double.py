@@ -20,7 +20,7 @@ from directory import CONFIG_DIR, SAVE_DIR, NOTIFYHUB_FP
 from nets.dtr import DTR
 
 DNA_BASES = ['A', 'T', 'C', 'G']
-NUM_WORKERS = 2
+NUM_WORKERS = 0
 
 
 def get_train_test_data(dataset: str) -> (np.ndarray, np.ndarray, os.path, os.path):
