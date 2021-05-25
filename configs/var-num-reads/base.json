@@ -8,8 +8,6 @@
 
   "max nepochs": 50,
   "train batchsize": 256,
-  "test batchsize": 256,
-  "nreads per cluster": 10,
 
   "net": {
     "embed": {

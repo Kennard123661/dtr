@@ -7,8 +7,8 @@
   "dataset": "blast",
 
   "max nepochs": 50,
-  "train batchsize": 256,
-  "test batchsize": 256,
+  "train batchsize": 2,
+  "test batchsize": 2,
   "nreads per cluster": 10,
 
   "net": {
@@ -41,6 +41,6 @@
     },
 
     "activation": "relu",
-    "normalization": "batch"
+    "normalization": "instance"
   }
 }

@@ -20,7 +20,7 @@ from directory import CONFIG_DIR, SAVE_DIR, NOTIFYHUB_FP
 from nets.dtr import DTR
 
 DNA_BASES = ['A', 'T', 'C', 'G']
-NUM_WORKERS = 0
+NUM_WORKERS = 12
 
 
 def get_train_test_data(dataset: str) -> (np.ndarray, np.ndarray, os.path, os.path):
@@ -41,31 +41,23 @@ def get_train_test_data(dataset: str) -> (np.ndarray, np.ndarray, os.path, os.pa
 
 
 class Dataset(tdata.Dataset):
-    def __init__(self, cluster_idxs: np.ndarray, reference_file: os.path, read_dir: os.path, read_batchsize: int,
-                 window_size: int):
+    def __init__(self, cluster_idxs: np.ndarray, reference_file: os.path, read_dir: os.path, window_size: int):
         super(Dataset, self).__init__()
         for i in cluster_idxs:
             read_file = os.path.join(read_dir, '{}.txt'.format(i))
             assert os.path.exists(read_file)
         with open(reference_file, 'r') as f:
             references = f.readlines()
-        references = [reference.strip() for reference in references]
-        references = [references[i] for i in cluster_idxs]
-        references = [self.to_tensor(strand=line) for line in references]
-        self.references = [torch.argmax(line, dim=1).reshape(-1) for line in references]
-        self.read_batchsize = read_batchsize
-        self.cluster_idxs = cluster_idxs
-        self.window_size = window_size
-        self.read_dir = read_dir
 
-        all_reads = []
-        for cluster_idx in cluster_idxs:
-            read_file = os.path.join(self.read_dir, '{}.txt'.format(cluster_idx))
-            with open(read_file, 'r') as f:
-                reads = f.readlines()
-            reads = [read.strip() for read in reads]
-            all_reads.append(reads)
-        self.all_reads = all_reads
+        # parse the reference strands
+        references = [reference.strip() for reference in references]
+        references = [list(reference) for reference in references]
+        references = [np.array([DNA_BASES.index(base) for base in reference]) for reference in references]
+        references = [torch.from_numpy(reference).long() for reference in references]
+
+        self.references = [references[i] for i in cluster_idxs]
+        self.read_files = [os.path.join(read_dir, '{}.txt'.format(i)) for i in cluster_idxs]
+        self.window_size = window_size
 
     @staticmethod
     def to_tensor(strand: str) -> torch.Tensor:
@@ -79,18 +71,22 @@ class Dataset(tdata.Dataset):
 
     def __getitem__(self, i):
         reference = self.references[i]
-        reads = self.all_reads[i]
+        reference_length = reference.shape[0]
 
-        sample_idxs = np.random.choice(len(reads), size=self.read_batchsize, replace=True)
-        reads = [reads[i] for i in sample_idxs]
+        # parse reads
+        read_file = self.read_files[i]
+        with open(read_file, 'r') as f:
+            reads = f.readlines()
+        reads = [read.strip() for read in reads]
         reads = [self.to_tensor(read) for read in reads]
 
         read_lengths = [read.shape[0] for read in reads]
-        reference_length = reference.shape[0]
         batch_length = max(max(read_lengths), reference_length + self.window_size)
 
-        forward_reads = torch.zeros(size=[self.read_batchsize, batch_length, 4], dtype=torch.float)
-        backward_reads = torch.zeros(size=[self.read_batchsize, batch_length, 4], dtype=torch.float)
+        # create batch sizes todo: check whether its created properly.
+        num_reads = len(reads)
+        forward_reads = torch.zeros(size=[num_reads, batch_length, 4], dtype=torch.float)
+        backward_reads = torch.zeros(size=[num_reads, batch_length, 4], dtype=torch.float)
         for i, read in enumerate(reads):
             read_length = read_lengths[i]
             forward_reads[i, :read_length] = read
@@ -100,37 +96,14 @@ class Dataset(tdata.Dataset):
             backward_reads[i, :read_length] = read
         return forward_reads, backward_reads, reference
 
-    def collate_fn(self, batch) -> (torch.Tensor, torch.Tensor, list):
+    @staticmethod
+    def collate_fn(batch) -> (torch.Tensor, torch.Tensor, list):
         forward_reads, backward_reads, batch_references = zip(*batch)
-        batchsize = len(batch_references)
-
-        max_forward_length = max([read.shape[1] for read in forward_reads])
-        max_backward_length = max([read.shape[1] for read in backward_reads])
-
-        # process reads.
-        def process_batch_reads(_batch_reads: list, _max_length: int) -> torch.Tensor:
-            """
-
-            Args:
-                _batch_reads: B x T x 4 read tensor
-                _max_length: Tmax, maximum length of the reads.
-
-            Returns:
-
-            """
-            _out = torch.zeros(size=[batchsize, self.read_batchsize, _max_length, 4], dtype=torch.float)  # B x R x T x 4
-            for _i, _reads in enumerate(_batch_reads):
-                _read_length = _reads.shape[1]
-                _out[_i, :, :_read_length] = _reads
-            return _out
-        forward_reads = process_batch_reads(_batch_reads=forward_reads, _max_length=max_forward_length)
-        backward_reads = process_batch_reads(_batch_reads=backward_reads, _max_length=max_backward_length)
-
-        # process references
-        return forward_reads, backward_reads, batch_references
+        assert len(forward_reads) == len(backward_reads) == len(batch_references) == 1, 'batch size should be 1'
+        return forward_reads[0], backward_reads[0], batch_references[0]
 
     def __len__(self):
-        return len(self.cluster_idxs)
+        return len(self.references)
 
 
 class Trainer:
@@ -138,20 +111,24 @@ class Trainer:
         super(Trainer, self).__init__()
 
         experiment = '{}-{}'.format(config, instance)
-        config_file = os.path.join(CONFIG_DIR, config + '.json')
+        config_file = os.path.join(CONFIG_DIR, 'var-num-reads', config + '.json')
         with open(config_file, 'r') as f:
             config = json.load(f)
         self.device = device
         self.config = config
 
         save_dir = os.path.join(SAVE_DIR, experiment)
-        self.checkpoint_dir = os.path.join(save_dir, 'checkpoints')
+        self.checkpoint_dir = os.path.join(save_dir, 'var-num-reads', 'checkpoints')
         self.log_dir = os.path.join(save_dir, 'logs')
         self.result_dir = os.path.join(save_dir, 'results')
         self.prediction_dir = os.path.join(self.result_dir, 'predictions')
 
         os.makedirs(self.log_dir, exist_ok=True)
         self.summary_writer = SummaryWriter(self.log_dir)
+
+        self.max_nepochs = config['max nepochs']
+        self.train_batchsize = config['train batchsize']
+        self.epoch = 0
 
         net_config = config['net']
         net = DTR(emb_out_ndims=net_config['embed']['out ndims'], emb_base_ndims=net_config['embed']['base ndims'],
@@ -168,14 +145,9 @@ class Trainer:
         optimizer_config = config['optimizer']
         optimizer = optimizer_config['name']
         if optimizer == 'adam':
-            self.optimizer = optim.Adam(lr=optimizer_config['lr'], params=net.parameters())
+            self.optimizer = optim.Adam(lr=optimizer_config['lr'] / self.train_batchsize, params=net.parameters())
         else:
             raise ValueError('no such optimizer')
-
-        self.max_nepochs = config['max nepochs']
-        self.train_batchsize = config['train batchsize']
-        self.test_batchsize = config['test batchsize']
-        self.epoch = 0
 
         self.loss_fn = torch.nn.CrossEntropyLoss()
         self.load_checkpoint()
@@ -188,8 +160,7 @@ class Trainer:
         else:
             start_epoch = self.epoch
             train_dataset = Dataset(cluster_idxs=train_idxs, reference_file=reference_file, read_dir=read_dir,
-                                    window_size=self.config['net']['window']['window size'],
-                                    read_batchsize=self.config['nreads per cluster'])
+                                    window_size=self.config['net']['window']['window size'])
 
             for i in range(start_epoch, self.max_nepochs):
                 loss = self.train_epoch(dataset=train_dataset)
@@ -219,28 +190,26 @@ class Trainer:
 
     def train_epoch(self, dataset: Dataset) -> float:
         self.net.train()
-        dataloader = tdata.DataLoader(dataset=dataset, batch_size=self.train_batchsize, collate_fn=dataset.collate_fn,
+        self.optimizer.zero_grad()
+        dataloader = tdata.DataLoader(dataset=dataset, batch_size=1, collate_fn=dataset.collate_fn,
                                       num_workers=NUM_WORKERS, shuffle=True, drop_last=True)
 
         losses = []
         pbar = tqdm(dataloader)
-        for forward_reads, backward_reads, references in pbar:
-            batchsize = len(forward_reads)
-            reference_lengths = [len(reference) for reference in references]
-            predictions = self.get_predictions(forward_reads=forward_reads, backward_reads=backward_reads,
-                                               prediction_lengths=reference_lengths)
+        for i, (forward_reads, backward_reads, reference) in enumerate(pbar, start=1):
+            reference_length = len(reference)
+            reference = reference.to(self.device)
 
-            loss = torch.tensor(0., device=self.device)
-            for i, prediction in enumerate(predictions):
-                reference = references[i].to(self.device)
-                loss += self.loss_fn(prediction, reference)
-            loss /= batchsize
+            prediction = self.get_prediction(forward_reads=forward_reads, backward_reads=backward_reads,
+                                             prediction_length=reference_length)
+            loss = self.loss_fn(prediction, reference)
 
             self.optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
             losses.append(loss.item())
 
+            if (i % self.train_batchsize) == 0:
+                self.optimizer.step()
             pbar.set_postfix({'loss': losses[-1]})
         avg_loss = float(np.mean(losses).item())
         self.epoch += 1
@@ -255,27 +224,23 @@ class Trainer:
         unprocessed_idxs = np.setdiff1d(cluster_idxs, processed_idxs).reshape(-1)
         if len(unprocessed_idxs) > 0:
             dataset = Dataset(cluster_idxs=unprocessed_idxs, reference_file=reference_file, read_dir=read_dir,
-                              window_size=self.config['net']['window']['window size'],
-                              read_batchsize=self.config['nreads per cluster'])
-            dataloader = tdata.DataLoader(dataset=dataset, batch_size=self.test_batchsize,
-                                          collate_fn=dataset.collate_fn, num_workers=NUM_WORKERS,
-                                          shuffle=False, drop_last=False)
+                              window_size=self.config['net']['window']['window size'])
+            dataloader = tdata.DataLoader(dataset=dataset, batch_size=1, collate_fn=dataset.collate_fn,
+                                          num_workers=NUM_WORKERS, shuffle=False, drop_last=False)
 
             print('INFO: predicting DNA strands...')
             pbar = tqdm(dataloader)
-            counter = 0
             with torch.no_grad():
-                for forward_reads, backward_reads, references in pbar:
-                    prediction_lengths = [reference.shape[0] for reference in references]
-                    predictions = self.get_predictions(forward_reads=forward_reads, backward_reads=backward_reads,
-                                                       prediction_lengths=prediction_lengths)
-                    for i, prediction in enumerate(predictions):
-                        prediction = torch.argmax(prediction, dim=1).reshape(-1).cpu().numpy()
-                        prediction = [dna_bases[idx] for idx in prediction]
-                        assert len(prediction) == prediction_lengths[i]
-                        prediction_file = os.path.join(self.prediction_dir, '{}.npy'.format(unprocessed_idxs[counter]))
-                        np.save(prediction_file, prediction)
-                        counter += 1
+                for i, (forward_reads, backward_reads, reference) in enumerate(pbar):
+                    prediction_length = reference.shape[0]
+
+                    prediction = self.get_prediction(forward_reads=forward_reads, backward_reads=backward_reads,
+                                                     prediction_length=prediction_length)
+                    prediction = torch.argmax(prediction, dim=1).reshape(-1).cpu().numpy()
+                    prediction = [dna_bases[idx] for idx in prediction]
+
+                    prediction_file = os.path.join(self.prediction_dir, '{}.npy'.format(unprocessed_idxs[i]))
+                    np.save(prediction_file, prediction)
 
         print('INFO: evaluating...')
         nbases, nstrands, base_acc, strand_acc = 0, 0, 0., 0.
@@ -317,37 +282,33 @@ class Trainer:
         notifyhub.send(message=message, config_fp=NOTIFYHUB_FP)
         return results
 
-    def get_predictions(self, forward_reads: torch.Tensor, backward_reads: torch.Tensor, prediction_lengths) -> list:
+    def get_prediction(self, forward_reads: torch.Tensor, backward_reads: torch.Tensor,
+                       prediction_length: int) -> torch.Tensor:
         """
 
         Args:
-            forward_reads: B x R x T x 4 reads
-            backward_reads: B x R x T x 4 reads
-            prediction_lengths: B x R x T x 4 reads
+            forward_reads: R x T x 4 reads
+            backward_reads: R x T x 4 reads
+            prediction_length: integer indicating length of output prediction
 
         Returns:
 
         """
-        batchsize, num_reads, _, _ = forward_reads.shape
-        max_read_length = max([forward_reads.shape[2], backward_reads.shape[2]])
-        reads = torch.zeros(size=[batchsize * 2, num_reads, max_read_length, 4])
-        reads[:batchsize, :, :forward_reads.shape[2]] = forward_reads
-        reads[batchsize:, :, :backward_reads.shape[2]] = backward_reads
+        num_reads, _, _ = forward_reads.shape
+        assert forward_reads.shape == backward_reads.shape
+
+        reads = torch.stack([forward_reads, backward_reads], dim=0)
         reads = reads.to(self.device)
+        out = self.net(reads, prediction_length)
 
-        max_prediction_length = max(prediction_lengths)
-        out = self.net(reads, max_prediction_length)
-        predictions = []
-        for i, prediction_length in enumerate(prediction_lengths):
-            backward_length = prediction_length // 2
-            forward_length = prediction_length - backward_length
-            forwad_prediction = out[i, :forward_length]
-            backward_prediction = torch.flip(out[i+batchsize, :backward_length], dims=[0])
+        backward_length = prediction_length // 2
+        forward_length = prediction_length - backward_length
 
-            prediction = torch.cat([forwad_prediction, backward_prediction], dim=0)
-            assert prediction.shape[0] == prediction_length
-            predictions.append(prediction)
-        return predictions
+        forward_prediction = out[0, :forward_length]
+        backward_prediction = torch.flip(out[1, :backward_length], dims=[0])
+        prediction = torch.cat([forward_prediction, backward_prediction], dim=0)
+        assert prediction.shape[0] == prediction_length
+        return prediction
 
 
 @notifyhub.watch(config_fp=NOTIFYHUB_FP)

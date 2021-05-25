@@ -4,20 +4,21 @@ from nets import Linear, MlpNet, Conv1dNet
 
 
 class PredictionNet(nn.Module):
-    def __init__(self, in_ndims: int, out_ndims: int, base_ndims: int, nlayers: int, activation: str = None, batchnorm: bool = False):
+    def __init__(self, in_ndims: int, out_ndims: int, base_ndims: int, nlayers: int, activation: str = None,
+                 normalization: str = None):
         super(PredictionNet, self).__init__()
 
         if nlayers == 2:
-            net = [Linear(in_ndims=in_ndims, out_ndims=base_ndims, activation=activation, batchnorm=batchnorm)]
+            net = [Linear(in_ndims=in_ndims, out_ndims=base_ndims, activation=activation, normalization=normalization)]
         elif nlayers > 2:
             net = [MlpNet(in_ndims=in_ndims, out_ndims=base_ndims, base_ndims=base_ndims, activation=activation,
-                          nlayers=nlayers-1, batchnorm=batchnorm)]
+                          nlayers=nlayers-1, normalization=normalization)]
         else:
             net = list()
 
         if nlayers >= 2:
             in_ndims = base_ndims
-        net.append(Linear(in_ndims=in_ndims, out_ndims=out_ndims, activation=None, batchnorm=batchnorm))
+        net.append(Linear(in_ndims=in_ndims, out_ndims=out_ndims, activation=None, normalization=normalization))
         self.net = nn.Sequential(*net)
 
     def forward(self, x: torch.Tensor):
@@ -27,12 +28,12 @@ class PredictionNet(nn.Module):
 
 class WindowEmbeddingNet(nn.Module):
     def __init__(self, in_ndims, out_ndims: int, base_ndims: int, window_size: int, activation: str = None,
-                 batchnorm: bool = False):
+                 normalization: str = None):
         super(WindowEmbeddingNet, self).__init__()
         self.in_ndims = in_ndims
         self.window_size = window_size
         self.net = MlpNet(in_ndims=in_ndims * window_size, out_ndims=out_ndims, base_ndims=base_ndims, nlayers=2,
-                          activation=activation, batchnorm=batchnorm)
+                          activation=activation, normalization=normalization)
 
     def forward(self, x: torch.Tensor):
         assert len(x.shape) == 3, 'BR x D x W'
@@ -61,12 +62,12 @@ class Lstm(nn.Module):
 
 class MultiHeadAttentionAggregation(nn.Module):
     def __init__(self, in_ndims: int, out_ndims: int, att_ndims: int, natt_heads: int, activation: str = None,
-                 batchnorm: bool = False):
+                 normalization: str = None):
         super(MultiHeadAttentionAggregation, self).__init__()
         self.att_nets = nn.ModuleList([SelfAttentionAggregation(in_ndims=in_ndims, out_ndims=out_ndims,
                                                                 att_ndims=att_ndims) for _ in range(natt_heads)])
         self.net = Linear(in_ndims=out_ndims * natt_heads, out_ndims=out_ndims, activation=activation,
-                          batchnorm=batchnorm)
+                          normalization=normalization)
 
     def forward(self, batch_reads: torch.Tensor):
         out = [att_net(batch_reads) for att_net in self.att_nets]
@@ -112,30 +113,34 @@ class DTR(nn.Module):
                  update_base_ndims: int,
                  global_natt_heads: int,
                  pred_base_ndims: int,
-                 activation: str = None, batchnorm: bool = False):
+                 activation: str = None, normalization: str = None):
         super(DTR, self).__init__()
         self.embedding_net = Conv1dNet(in_ndims=4, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
-                                       padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
+                                       padding=1, nlayers=emb_nlayers, activation=activation,
+                                       normalization=normalization)
         self.belief_initializer = Conv1dNet(in_ndims=4, out_ndims=emb_out_ndims, base_ndims=emb_base_ndims, ksize=3,
-                                            padding=1, nlayers=emb_nlayers, activation=activation, batchnorm=batchnorm)
+                                            padding=1, nlayers=emb_nlayers, activation=activation,
+                                            normalization=normalization)
         self.belief_normalization = nn.InstanceNorm1d(emb_out_ndims)
 
         self.window_size = window_size
         self.window_net = WindowEmbeddingNet(in_ndims=emb_out_ndims*2, out_ndims=window_out_ndims,
                                              base_ndims=window_base_ndims,
-                                             window_size=window_size, activation=activation, batchnorm=batchnorm)
+                                             window_size=window_size, activation=activation,
+                                             normalization=normalization)
 
         self.lstm = Lstm(in_ndims=window_out_ndims, out_ndims=lstm_out_ndims)
 
         self.global_feat_net = MultiHeadAttentionAggregation(in_ndims=lstm_out_ndims, out_ndims=lstm_out_ndims,
                                                              att_ndims=lstm_out_ndims, natt_heads=global_natt_heads,
-                                                             activation=activation, batchnorm=batchnorm)
+                                                             activation=activation, normalization=normalization)
 
         self.update_net = MlpNet(in_ndims=lstm_out_ndims * 2, out_ndims=emb_out_ndims*(window_size-1),
-                                 base_ndims=update_base_ndims, nlayers=2, activation=activation, batchnorm=batchnorm)
+                                 base_ndims=update_base_ndims, nlayers=2, activation=activation,
+                                 normalization=normalization)
 
         self.prediction_net = MlpNet(in_ndims=lstm_out_ndims, out_ndims=5, nlayers=2, base_ndims=pred_base_ndims,
-                                     activation=activation, batchnorm=batchnorm)
+                                     activation=activation, normalization=normalization)
 
     def forward(self, reads: torch.Tensor, out_length: int):
         batchsize, nreads, sequence_length, _ = reads.shape
@@ -180,7 +185,7 @@ class DTR(nn.Module):
 
 def main():
     import json
-    config_file = '/home/kennardng/projects/dtr/configs/base.json'
+    config_file = '/home/kennardng/projects/dtr/configs/base-instance.json'
     # config_file = '/home/kennardngpoolhua/Desktop/deep-trace/configs/lstm/base-atth4-er10-w14.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
@@ -195,7 +200,7 @@ def main():
                 update_base_ndims=config['update']['base ndims'],
                 global_natt_heads=config['global']['natt heads'],
                 pred_base_ndims=config['pred']['base ndims'],
-                activation=config['activation'], batchnorm=config['batchnorm'])
+                activation=config['activation'], normalization=config['normalization'])
     forward_data = torch.randn(size=[3, 10, 130, 4]).float()
     backward_data = torch.randn(size=[3, 10, 130, 4]).float()
     out = model(forward_data, out_length)
